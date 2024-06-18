@@ -1,17 +1,20 @@
+// Original code by: Dave KK6DF
+// Git : https://github.com/dfannin/siggen4351/
+// Published under MIT License
+
 #include <Arduino.h>
 #include "adf4351.h"
 #include "configEE.h"
 #include <OneWireKey.h>
 #include <LiquidCrystal_PCF8574.h>
-#include <ACE128.h>
-#include <ACE128map87654321.h>
+#include "rotaryDecoder.h"
 
-#define SWVERSION "1.0s"
+#define SWVERSION "1.0w"
 
 //  pinSS, mode, speed, endian
 ADF4351  vfo(PIN_SS,SPI_MODE0, 1000000UL , MSBFIRST) ; 
 
-#define OWK_ADDR 0x26
+#define OWK_ADDR 0x25
 OneWireKey owk = OneWireKey(OWK_ADDR) ; 
 
 #define LCD_ADDR 0x27
@@ -20,8 +23,7 @@ LiquidCrystal_PCF8574 lcd(LCD_ADDR);
 unsigned long lcdtimer = 0 ; 
 byte lcd_backlight_override = false ; 
 
-#define ACE_ADDR 0x3D
-ACE128 re((uint8_t) ACE_ADDR, (uint8_t*) encoderMap_87654321 ) ;
+rotaryDecoder decoder(0x24);
 uint8_t cupos = 0 ;
 uint8_t pupos = 0  ;  
 unsigned long retimer = 0 ; 
@@ -515,8 +517,8 @@ int parse_cmd(char c) {
 
 void setup() {
     Serial.begin(9600) ;
-    Serial.print(F("Hello adf4351 v")) ; 
-    Serial.println(SWVERSION) ;
+    Serial.println(F("Hello adf4351 v")) ; 
+    Serial.print(SWVERSION) ;
     Wire.begin() ; 
     pinMode(PIN_LEDA, OUTPUT) ;
     digitalWrite(PIN_LEDA,LOW) ; 
@@ -538,14 +540,14 @@ void setup() {
     owk.init() ;
     owk.addEventListener(gotkey) ; 
 
-    if ( checkI2C(ACE_ADDR) > 0 ) {
-        lcd.setCursor(0,1) ; 
-        lcd.print(F("ACE not found")) ; 
-        while(1) blink_led() ;  
-    }
+   // if ( checkI2C(ACE_ADDR) > 0 ) {
+   //     lcd.setCursor(0,1) ; 
+   //     lcd.print(F("ACE not found")) ; 
+   //     while(1) blink_led() ;  
+   // }
 
-    re.begin() ; 
-    re.setMpos(0) ;
+    decoder.begin() ; 
+    decoder.readInitialState() ;
 
     lcd.setCursor(0,1) ;
     lcd.print(F("Checks Passed")) ; 
@@ -577,7 +579,7 @@ void loop() {
 
     if (millis() - retimer > 150) {
         retimer = millis() ; 
-        cupos = re.upos() ;
+        cupos = decoder.update() ;
 
         if ( reguardtime > 0 ) {
             reguardtime-- ; 
